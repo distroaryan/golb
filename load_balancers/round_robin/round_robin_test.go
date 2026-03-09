@@ -73,3 +73,50 @@ func TestRoundRobin(t *testing.T) {
 	}
 	t.Logf("Round Robin test passed. Distribution: %v", serverHits)
 }
+
+func TestRoundRobinConcurrecny(t *testing.T) {
+	servers := make([]*MockServer, 10)
+	urls := make([]*url.URL, 10)
+
+	for i := range 10 {
+		servers[i] = NewMockServer(i)
+		urls[i] = servers[i].URL()
+	}
+
+	lb := NewRoundRobin(urls)
+
+	serverHits := make(map[string]int)
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	for range 1000 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			server := lb.NextServer()
+			if server != nil {
+				mu.Lock()
+				serverHits[server.String()]++
+				mu.Unlock()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	totalHits := 0
+	for serverURL, hits := range serverHits {
+		totalHits += hits
+		if hits != 100 {
+			t.Errorf("Round Robin failed: Server %s got %d requests, expected 10", serverURL, hits)
+		}
+	}
+
+	if totalHits != 1000 {
+		t.Errorf("Concurrent Round Robin failed: Total hits %d, expected 100", totalHits)
+	}
+
+	t.Logf("Concurrent Round Robin test passed. Distribution: %v", serverHits)
+}
+
