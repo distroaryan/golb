@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/distroaryan/golb"
 	healthchecker "github.com/distroaryan/golb/health_checker"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -21,42 +21,57 @@ const (
 	HEALTH_CHECK_PERIOD = 5 * time.Second
 )
 
-func StartMockServers() ([]*httptest.Server, []*url.URL, error) {
-	servers := make([]*httptest.Server, NUMBER_OF_SERVERS)
-	urls := make([]*url.URL, NUMBER_OF_SERVERS)
+type MockServer struct {
+	Server *httptest.Server
+	URL *url.URL 
+	Alive *atomic.Bool 
+}
+
+func StartMockServers() ([]*MockServer) {
+	servers := make([]*MockServer, NUMBER_OF_SERVERS)
 
 	for i := range NUMBER_OF_SERVERS {
+		servers[i] = &MockServer{
+			Alive: &atomic.Bool{},
+		}
+
+		servers[i].Alive.Store(true)
+
 		mux := http.NewServeMux()
-		server := httptest.NewServer(mux)
+		servers[i].Server = httptest.NewServer(mux)
 
 		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Println("Health check success success from server")
+			if(!servers[i].Alive.Load()){
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return 
+			}
+			w.WriteHeader(http.StatusOK)
 		})
 
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprint(w, server.URL)
+			fmt.Fprint(w, servers[i].Server.URL)
 		})
 
-		servers[i] = server
-		url, err := url.Parse(server.URL)
+		url, err := url.Parse(servers[i].Server.URL)
 		if err != nil {
 			panic("Error parsing the mock server URL")
 		}
-		urls[i] = url
+		servers[i].URL = url 
 	}
 
-	return servers, urls, nil
+	return servers
 }
 
-func NewMockLoadBalancer() (*url.URL, []*url.URL, []*httptest.Server, context.CancelFunc) {
-	servers, urls, err := StartMockServers()
-	if err != nil {
-		panic("Error starting mock servers")
+func NewMockLoadBalancer() (*url.URL, []*MockServer, context.CancelFunc) {
+	mockServers := StartMockServers()
+	serverURLs := []*url.URL{}
+	for _, mockServer := range mockServers {
+		serverURLs = append(serverURLs, mockServer.URL)
 	}
-	lb := golb.NewLoadBalancer("rr", urls)
+	lb := golb.NewLoadBalancer("rr", serverURLs)
 
 	// Start the healthchecker
-	hc := healthchecker.NewHealthChecker(HEALTH_CHECK_PERIOD, urls, lb)
+	hc := healthchecker.NewHealthChecker(HEALTH_CHECK_PERIOD, serverURLs, lb)
 	ctx, cancel := context.WithCancel(context.Background())
 	hc.Start(ctx)
 
@@ -67,17 +82,17 @@ func NewMockLoadBalancer() (*url.URL, []*url.URL, []*httptest.Server, context.Ca
 	if err != nil {
 		panic("Error starting load balancer")
 	}
-	return lbURL, urls, servers, cancel
+	return lbURL, mockServers, cancel
 }
 
 func TestRoundRobinDistribution(t *testing.T) {
-	lbURL, urls, _, cancel := NewMockLoadBalancer()
+	lbURL, mockServers, cancel := NewMockLoadBalancer()
 	defer cancel()
 	// Make 50 requests to the load balancer, each server should get 10 requests
 	urlHitRate := map[string]int{}
 
-	for _, url := range urls {
-		urlHitRate[url.String()] = 0
+	for _, s := range mockServers {
+		urlHitRate[s.URL.String()] = 0
 	}
 
 	for range 50 {
@@ -96,7 +111,7 @@ func TestRoundRobinDistribution(t *testing.T) {
 }
 
 func TestHealthCheckerMarksUnHealthyServer(t *testing.T) {
-	lbURL, urls, servers, cancel := NewMockLoadBalancer()
+	lbURL, mockServers, cancel := NewMockLoadBalancer()
 	defer cancel()
 	// FIRST 40 requests -> 5 servers -> 8 request per each
 	// LAST 10 request -> 2 servers -> 5 request per each
@@ -105,8 +120,8 @@ func TestHealthCheckerMarksUnHealthyServer(t *testing.T) {
 
 	urlHitRate := map[string]int{}
 
-	for _, url := range urls {
-		urlHitRate[url.String()] = 0 
+	for _, s := range mockServers {
+		urlHitRate[s.Server.URL] = 0 
 	}
 
 	for range 40 {
@@ -126,10 +141,9 @@ func TestHealthCheckerMarksUnHealthyServer(t *testing.T) {
 	// Close any random 3 servers
 	closedServerUrls := map[string]bool{}
 	for i:= range 3 {
-		serverURL, err := url.Parse(servers[i].URL)
-		require.NoError(t, err)
-		closedServerUrls[serverURL.String()] = true 
-		servers[i].Close()
+		serverURL := mockServers[i].Server.URL
+		closedServerUrls[serverURL] = true 
+		mockServers[i].Server.Close()
 	}
 
 	// UPDATE THE HEALTH MAP
@@ -156,13 +170,13 @@ func TestHealthCheckerMarksUnHealthyServer(t *testing.T) {
 }
 
 func TestServerRecovery(t *testing.T) {
-	lbURL, urls, server, cancel := NewMockLoadBalancer()
+	lbURL, mockServers, cancel := NewMockLoadBalancer()
 	defer cancel()
 
 	urlHitRate := map[string]int{}
 
-	for _, url := range urls {
-		urlHitRate[url.String()] = 0
+	for _, s := range mockServers {
+		urlHitRate[s.Server.URL] = 0
 	}
 
 	// CLOSE FIRST 3 SERVERS
@@ -171,14 +185,13 @@ func TestServerRecovery(t *testing.T) {
 
 	closedServerUrls := map[string]bool{}
 	for i := range 3 {
-		serverURL, err := url.Parse(server[i].URL)
-		require.NoError(t, err)
-		closedServerUrls[serverURL.String()] = true
-		server[i].Close()
+		serverURL := mockServers[i].Server.URL 
+		mockServers[i].Alive.Store(false)
+		closedServerUrls[serverURL] = true
 	}
 
 	// UPDATE THE HEALTH MAP
-	time.Sleep(HEALTH_CHECK_PERIOD)
+	time.Sleep(2 * HEALTH_CHECK_PERIOD)
 
 	for range 10 {
 		resp, err := http.Get(lbURL.String())
@@ -190,6 +203,7 @@ func TestServerRecovery(t *testing.T) {
 	}
 
 	for serverURL, hitRate := range urlHitRate {
+		// t.Logf("Server calls %d", hitRate)
 		if closedServerUrls[serverURL] {
 			assert.Equal(t, 0, hitRate)
 		} else{
@@ -197,5 +211,36 @@ func TestServerRecovery(t *testing.T) {
 		}
 	}
 
-	
+	// // START THE FIRST 3 SERVERS
+	for i := range 3 {
+		mockServers[i].Alive.Store(true)
+	}
+
+		// UPDATE THE HEALTH MAP
+	time.Sleep(2 * HEALTH_CHECK_PERIOD)
+
+	// // CURRENT STATE
+	// // 3 SERVERS -> 0 REQUESTS (NOW-ACTIVE)
+	// // 2 SERVERS -> 5 REQUESTS EACH
+
+	for range 50 {
+		resp, err := http.Get(lbURL.String())
+		assert.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		urlHitRate[string(body)]++
+		resp.Body.Close()
+	}
+
+	// // CURRENT STATE 
+	// // 3 REQUESTS -> 10 REQUESTS
+	// // 2 SERVERS -> 5 + 10 = 15 
+
+	for i, mockServer := range mockServers {
+		serverURL := mockServer.Server.URL 
+		if i < 3 {
+			assert.Equal(t, 10, urlHitRate[serverURL])
+		} else {
+			assert.Equal(t, 15, urlHitRate[serverURL])
+		}
+	}
 }
