@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/distroaryan/golb"
@@ -45,12 +46,16 @@ func (hc *HealthChecker) Start(ctx context.Context) {
 }
 
 func (hc *HealthChecker) updateHealthMap() error {
+	var wg sync.WaitGroup
 	for _, url := range hc.serversURL {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			healthCheck := pingServer(url)
 			hc.lb.UpdateHealth(url.String(), healthCheck)
 		}()
 	}
+	wg.Wait()
 	return nil
 }
 
