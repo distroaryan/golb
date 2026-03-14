@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/distroaryan/golb"
 	healthchecker "github.com/distroaryan/golb/health_checker"
+	"github.com/distroaryan/golb/logger"
 )
 
 const (
@@ -19,6 +19,9 @@ const (
 )
 
 func main() {
+	logger.InitLogger()
+	logger.Log.Info("Starting golb load balancer...")
+
 	var rawServersURL = make([]string, NUMBER_OF_SERVERS)
 	for i := range NUMBER_OF_SERVERS {
 		rawServersURL[i] = fmt.Sprintf("http://localhost:%d", 8001+i)
@@ -68,10 +71,17 @@ func main() {
 
 		lb.AddServerURL(parsedURL)
 
+		logger.Log.Info("Added new server dynamically", "url", parsedURL.String())
+
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(fmt.Sprintf("Successfully added server: %s\n", parsedURL.String())))
 	})
 
 	http.HandleFunc("/", lb.Handler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+
+	logger.Log.Info("Load balancer is listening", "port", 8080)
+	err := http.ListenAndServe(":8080", nil)
+	if err != nil {
+		logger.Log.Error("Load balancer failed to start", "error", err)
+	}
 }

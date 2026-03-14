@@ -2,13 +2,13 @@ package healthchecker
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
 
 	"github.com/distroaryan/golb"
+	"github.com/distroaryan/golb/logger"
 )
 
 type HealthChecker struct {
@@ -30,13 +30,17 @@ func (hc *HealthChecker) Start(ctx context.Context) {
 	go func() {
 		defer func() {
 			ticker.Stop()
-			log.Println("Health Checker stopped")
+			if logger.Log != nil {
+				logger.Log.Info("Health Checker stopped")
+			}
 		}()
 		for {
 			select {
 			case <-ticker.C:
 				if err := hc.updateHealthMap(); err != nil {
-					log.Printf("Health check error: %v", err)
+					if logger.Log != nil {
+						logger.Log.Error("Health check error", "error", err)
+					}
 				}
 			case <-ctx.Done():
 				return

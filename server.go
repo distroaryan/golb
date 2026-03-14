@@ -3,9 +3,10 @@ package golb
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
+
+	"github.com/distroaryan/golb/logger"
 )
 
 func StartServer(port int) {
@@ -19,9 +20,14 @@ func StartServer(port int) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	go func(){
-		log.Printf("Server started on PORT: %d", port)
-		log.Fatal(http.ListenAndServe(addr, mux))
+	go func() {
+		if logger.Log != nil {
+			logger.Log.Info("Server started", "port", port)
+		}
+		err := http.ListenAndServe(addr, mux)
+		if err != nil && logger.Log != nil {
+			logger.Log.Error("Server shutdown or failed", "port", port, "error", err)
+		}
 	}()
 }
 

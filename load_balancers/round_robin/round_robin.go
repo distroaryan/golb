@@ -1,12 +1,13 @@
 package roundrobin
 
 import (
-	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"sync"
 	"sync/atomic"
+
+	"github.com/distroaryan/golb/logger"
 )
 
 type RoundRobin struct {
@@ -43,7 +44,9 @@ func (lb *RoundRobin) NextServer() *url.URL {
 	}
 
 	if allServersDown {
-		log.Println("All the servers are down:")
+		if logger.Log != nil {
+			logger.Log.Warn("All servers are down")
+		}
 		return nil
 	}
 
@@ -75,7 +78,9 @@ func (lb *RoundRobin) Handler(w http.ResponseWriter, r *http.Request) {
 		proxyFailed := false
 
 		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-			log.Printf("[Attempt %d/%d] Server %s failed: %v", attempt+1, maxRetries, target.String(), err)
+			if logger.Log != nil {
+				logger.Log.Warn("Server request failed", "attempt", attempt+1, "maxRetries", maxRetries, "target", target.String(), "error", err)
+			}
 			lb.UpdateHealth(target.String(), false)
 			proxyFailed = true 
 		}
@@ -83,10 +88,16 @@ func (lb *RoundRobin) Handler(w http.ResponseWriter, r *http.Request) {
 		proxy.ServeHTTP(w, r)
 
 		if !proxyFailed {
+			if logger.Log != nil {
+				logger.Log.Info("Successfully proxied request", "target", target.String())
+			}
 			return 
 		}
 	}
 
+	if logger.Log != nil {
+		logger.Log.Error("Retries Exhausted, All servers failed", "maxRetries", maxRetries)
+	}
 	http.Error(w, "Retries Exhausted, All servers failed", http.StatusBadGateway)
 }
 
