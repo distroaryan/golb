@@ -1,10 +1,9 @@
-package golb
+package main
 
 import (
-	"context"
+	"flag"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/distroaryan/golb/logger"
 )
@@ -31,8 +30,9 @@ func StartServer(port int) {
 	}()
 }
 
-func StopServer(server *http.Server) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Second)
-	defer cancel()
-	return server.Shutdown(ctx)
+func main () {
+	port := flag.Int("port",8001, "Port to start the server on")
+	flag.Parse()
+	StartServer(*port)
+	select{}
 }

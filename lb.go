@@ -12,6 +12,7 @@ type LoadBalancer interface {
 	Handler(w http.ResponseWriter, r *http.Request)
 	UpdateHealth(serverURL string, status bool)
 	AddServerURL(serverURL *url.URL)
+	UpdateAdminMap(serverURL string, status bool)
 }
 
 func NewLoadBalancer(strategy string, servers []*url.URL) LoadBalancer {

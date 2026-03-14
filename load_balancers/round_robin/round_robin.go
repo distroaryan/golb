@@ -11,10 +11,11 @@ import (
 )
 
 type RoundRobin struct {
-	Servers        []*url.URL // [localhost:8001, localhost:8002, localhost:8003]
-	counter        int64
-	healthCheckMap map[string]bool // [localhost:8001] : true
-	mu             sync.Mutex
+	Servers          []*url.URL // [localhost:8001, localhost:8002, localhost:8003]
+	counter          int64
+	healthCheckMap   map[string]bool // [localhost:8001] : true
+	mu               sync.Mutex
+	adminDisabledMap map[string]bool // used to simulate enable and disable
 }
 
 func NewRoundRobin(servers []*url.URL) *RoundRobin {
@@ -57,7 +58,8 @@ func (lb *RoundRobin) NextServer() *url.URL {
 		idx := atomic.AddInt64(&lb.counter, 1)
 		// -1 bcoz initially the idx = 1, but we redirect to 0th index url
 		nextServerURL = lb.Servers[(idx-1)%int64(totalServers)]
-		if lb.healthCheckMap[nextServerURL.String()] {
+		serverURL := nextServerURL.String()
+		if lb.healthCheckMap[serverURL] && lb.adminDisabledMap[serverURL] {
 			break
 		}
 	}
@@ -68,11 +70,11 @@ func (lb *RoundRobin) NextServer() *url.URL {
 func (lb *RoundRobin) Handler(w http.ResponseWriter, r *http.Request) {
 	maxRetries := len(lb.Servers)
 
-	for attempt := range 1 {
+	for attempt := range maxRetries {
 		target := lb.NextServer()
 		if target == nil {
 			http.Error(w, "No Servers Available", http.StatusServiceUnavailable)
-			return 
+			return
 		}
 		proxy := httputil.NewSingleHostReverseProxy(target)
 		proxyFailed := false
@@ -82,7 +84,7 @@ func (lb *RoundRobin) Handler(w http.ResponseWriter, r *http.Request) {
 				logger.Log.Warn("Server request failed", "attempt", attempt+1, "maxRetries", maxRetries, "target", target.String(), "error", err)
 			}
 			lb.UpdateHealth(target.String(), false)
-			proxyFailed = true 
+			proxyFailed = true
 		}
 
 		proxy.ServeHTTP(w, r)
@@ -91,7 +93,7 @@ func (lb *RoundRobin) Handler(w http.ResponseWriter, r *http.Request) {
 			if logger.Log != nil {
 				logger.Log.Info("Successfully proxied request", "target", target.String())
 			}
-			return 
+			return
 		}
 	}
 
@@ -109,7 +111,13 @@ func (lb *RoundRobin) UpdateHealth(serverURL string, healthy bool) {
 
 func (lb *RoundRobin) AddServerURL(serverURL *url.URL) {
 	lb.mu.Lock()
-	lb.healthCheckMap[serverURL.String()] = true 
+	lb.healthCheckMap[serverURL.String()] = true
 	lb.Servers = append(lb.Servers, serverURL)
+	lb.mu.Unlock()
+}
+
+func (lb *RoundRobin) UpdateAdminMap(serverURL string, status bool) {
+	lb.mu.Lock()
+	lb.adminDisabledMap[serverURL] = status 
 	lb.mu.Unlock()
 }

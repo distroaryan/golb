@@ -60,6 +60,7 @@ func (hc *HealthChecker) updateHealthMap() error {
 		}()
 	}
 	wg.Wait()
+	logger.Log.Info("Health Check completed")
 	return nil
 }
 
