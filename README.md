@@ -73,6 +73,26 @@ Loadex uses GitHub Actions to ensure code quality and stability. Whenever a new 
 
 ## Architecture
 
+```text
+       +--------+
+       | Client |
+       +--------+
+           |
+           v
++----------------------+
+|                      |
+|    Load Balancer     |
+|                      |
++----------------------+
+      /    |      \
+     /     |       \
+    v      v        v
+ +----+  +----+   +----+
+ | B1 |  | B2 |...| Bn |
+ +----+  +----+   +----+
+    Backend Servers
+```
+
 The Load Balancer consists of four main components
 
 1. **ServerPool**: Manages a collection of backends and health map for tracking which backends are healthy and which are not
@@ -240,7 +260,6 @@ The Load Balancer exposes REST endpoints:
 ```bash
 make build          # Build binaries to ./bin/
 make install        # Install to $GOPATH/bin
-make clean          # Remove build artifacts
 make test           # Run all tests
 make testsum        # Run tests using gotestsum
 make test-e2e       # Run integration tests
