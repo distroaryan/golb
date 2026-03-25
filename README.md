@@ -160,7 +160,7 @@ Verify installation:
 loadex --help
 ```
 
-### Step 4: Use the CLI
+### Use the CLI
 
 Now you can interact with your load balancer:
 
@@ -184,6 +184,7 @@ Check out the monitoring stack:
 - **Grafana**: http://localhost:3000 (login: admin/admin)
 
 **Grafana Dashboard Preview**
+
 ![Grafana Dashboard Preview](assets/grafana_dashboard.png)
 
 ### What You Have Now
@@ -286,6 +287,10 @@ Pre-provisioned at `observability/grafana-dashboard.json`. Panels:
 - **Load Distribution** — donut chart showing % traffic per backend
 - **Error Rate** — 5xx rate per backend
 
+**Grafana Dashboard Preview**
+
+![Grafana Dashboard Preview](assets/grafana_dashboard_2.png)
+
 ---
 
 ## Configuration
@@ -355,7 +360,7 @@ const (
 ## Project Structure
 
 ```
-golb/
+loadex/
 ├── cmd/
 │   ├── backend/        # Dummy backend HTTP server
 │   ├── loadbalancer/   # Main LB server (proxy + admin API)
