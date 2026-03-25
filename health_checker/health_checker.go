@@ -56,6 +56,7 @@ func (hc *HealthChecker) Start(ctx context.Context, interval time.Duration) {
 			for _, serverURL := range servers {
 				alive := hc.checkHealth(serverURL)
 				hc.serverPool.UpdateHealthMap(serverURL, alive)
+
 				if logger.Log != nil {
 					status := "DOWN"
 					if alive {

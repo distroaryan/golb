@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: "golb"
+    static_configs:
+      - targets: ["loadex:8080"]

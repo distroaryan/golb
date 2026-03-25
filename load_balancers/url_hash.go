@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/distroaryan/golb/logger"
+	"github.com/distroaryan/golb/observability"
 	pool "github.com/distroaryan/golb/server_pool"
 )
 
@@ -89,7 +91,12 @@ func (lb *IPHash) Handler(w http.ResponseWriter, r *http.Request) {
 		proxyFailed = true 
 	}
 
-	proxy.ServeHTTP(w, r)
+	rw := &observability.ResponseWriterRecorder{ResponseWriter: w, StatusCode: http.StatusOK}
+	start := time.Now()
+
+	proxy.ServeHTTP(rw, r)
+
+	observability.RecordMetrics(target.String(), r.Method, start, rw.StatusCode)
 
 	if proxyFailed {
 		http.Error(w, "Assigned server is currently unavailable", http.StatusBadGateway)

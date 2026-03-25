@@ -16,6 +16,7 @@ import (
 	lb "github.com/distroaryan/golb/load_balancers"
 	"github.com/distroaryan/golb/logger"
 	pool "github.com/distroaryan/golb/server_pool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -119,6 +120,9 @@ func main() {
 	go hc.Start(ctx, 5*time.Second)
 
 	mux := http.NewServeMux()
+
+	// Metrics Endpoint
+	mux.Handle("/metrics", promhttp.Handler())
 
 	// System Endpoints
 	mux.HandleFunc("/api/health", handleHealth)

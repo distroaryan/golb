@@ -33,11 +33,5 @@ clean:
 	@rm -rf $(BUILD_DIR)
 	@go clean
 
-run-backend:
-	@go run ./cmd/backend
-
-run-lb:
-	@go run ./cmd/loadbalancer
-
-run-cli:
-	@go run ./cmd/loadex
+loadex:
+	@./bin/loadex.exe

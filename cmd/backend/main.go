@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"os"
 )
 
 func main() {
@@ -12,7 +11,6 @@ func main() {
 	flag.IntVar(&port, "port", 8081, "Port for dummy backend server")
 	flag.Parse()
 
-	hostname, _ := os.Hostname()
 
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -21,7 +19,7 @@ func main() {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Response from backend: %s:%d\n", hostname, port)
+		fmt.Fprintf(w, "Response from backend: http://localhost:%d\n", port)
 	})
 
 	fmt.Printf("Starting dummy backend on port %d\n", port)
