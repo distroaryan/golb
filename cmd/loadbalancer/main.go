@@ -41,21 +41,6 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(healthMap)
 }
 
-func handleKill(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	target := r.URL.Query().Get("url")
-	if target == "" {
-		http.Error(w, "Missing url parameter", http.StatusBadRequest)
-		return
-	}
-	serverPool.UpdateHealthMap(target, false)
-	fmt.Fprintf(w, "Marked %s as dead\n", target)
-	logger.Log.Info("Manual kill-server executed", "url", target)
-}
-
 func handleAdd(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -126,7 +111,6 @@ func main() {
 
 	// System Endpoints
 	mux.HandleFunc("/api/health", handleHealth)
-	mux.HandleFunc("/api/kill", handleKill)
 	mux.HandleFunc("/api/add", handleAdd)
 	
 	// Fallback proxy

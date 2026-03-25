@@ -1,4 +1,4 @@
-.PHONY: all build test clean run-backend run-lb run-cli
+.PHONY: all build test clean build-backend build-lb build-cli demo k6 up down
 
 # Binary names
 BACKEND_BIN=backend.exe
@@ -33,5 +33,26 @@ clean:
 	@rm -rf $(BUILD_DIR)
 	@go clean
 
+up:
+	@docker compose up -d --build
+
+down:
+	@docker compose down
+
+k6:
+	@k6 run k6/loadtest.js
+
+demo:
+	@bash scripts/demo.sh
+
+setup:
+	@bash scripts/setup.sh
+
+health:
+	@bash scripts/health.sh
+
+failover:
+	@bash scripts/failover.sh
+
 loadex:
-	@./bin/loadex.exe
+	@./bin/loadex

@@ -71,23 +71,6 @@ var healthCmd = &cobra.Command{
 	},
 }
 
-var killCmd = &cobra.Command{
-	Use:   "kill-server",
-	Short: "Kill a server via loadex daemon",
-	Run: func(cmd *cobra.Command, args []string) {
-		reqURL := fmt.Sprintf("%s/api/kill?url=%s", adminURL, url.QueryEscape(targetURL))
-		req, _ := http.NewRequest("POST", reqURL, nil)
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			fmt.Println("Error killing server:", err)
-			return
-		}
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
-		fmt.Printf("Status: %s\nResponse: %s", resp.Status, string(body))
-	},
-}
-
 var addCmd = &cobra.Command{
 	Use:   "add-server",
 	Short: "Add a new backend server to the pool",
@@ -135,9 +118,6 @@ var makeReqCmd = &cobra.Command{
 
 func init() {
 	healthCmd.Flags().StringVarP(&adminURL, "url", "u", "http://localhost:8080", "URL of the loadex daemon")
-	killCmd.Flags().StringVarP(&adminURL, "admin-url", "u", "http://localhost:8080", "URL of the loadex daemon")
-	killCmd.Flags().StringVarP(&targetURL, "target", "t", "", "Target backend URL to kill")
-	killCmd.MarkFlagRequired("target")
 
 	addCmd.Flags().StringVarP(&adminURL, "admin-url", "u", "http://localhost:8080", "URL of the loadex daemon")
 	addCmd.Flags().StringVarP(&targetURL, "target", "t", "", "Target backend URL to add")
@@ -146,7 +126,7 @@ func init() {
 	makeReqCmd.Flags().StringVarP(&adminURL, "url", "u", "http://localhost:8080", "URL of the loadex proxy")
 	makeReqCmd.Flags().IntVarP(&reqCount, "count", "c", 100, "Number of requests to make")
 
-	rootCmd.AddCommand(healthCmd, killCmd, addCmd, makeReqCmd)
+	rootCmd.AddCommand(healthCmd, addCmd, makeReqCmd)
 }
 
 func main() {
