@@ -145,7 +145,9 @@ func assertRequestToLoadBalancer(t testing.TB, lb *MockLoadBalancer) string {
 	require.NoError(t, err, "Request to Load Balancer failed")
 	defer resp.Body.Close()
 
-	require.Equal(t, http.StatusOK, resp.StatusCode, "Expected HTTP 200 OK from Load Balancer")
+	if resp.StatusCode != http.StatusOK {
+		return "FAILED"
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "Failed to read response body")

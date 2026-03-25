@@ -14,7 +14,7 @@ export const options = {
   },
 };
 
-const BASE_URL = __ENV.LB_URL || "http://localhost:8080";
+const BASE_URL = "http://localhost:8080";
 
 export default function () {
   const res = http.get(BASE_URL);

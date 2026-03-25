@@ -1,4 +1,4 @@
-.PHONY: all build test clean build-backend build-lb build-cli demo k6 up down
+.PHONY: all build test clean build-backend build-lb build-cli demo k6 up down install test-e2e test-chaos testsum test-algo help
 
 # Binary names
 BACKEND_BIN=backend.exe
@@ -26,21 +26,28 @@ build-cli:
 
 test:
 	@echo "Running tests..."
-	@go test -v ./...
+	@go test -count=1 -v -race ./...
+
+test-e2e:
+	@echo "Running E2E tests..."
+	@go test -count=1 -v -race ./tests/... -run=TestE2E
+
+test-chaos:
+	@echo "Running Chaos tests..."
+	@go test -count=1 -v -race ./tests/... -run=TestChaos
+
+testsum:
+	@echo "Running tests with gotestsum..."
+	@gotestsum --format testname -- -count=1 -v -race ./...
+
+test-algo:
+	@echo "Running algorithm tests..."
+	@go test -count=1 -v -race ./load_balancers/...
 
 clean:
 	@echo "Cleaning up..."
 	@rm -rf $(BUILD_DIR)
 	@go clean
-
-up:
-	@docker compose up -d --build
-
-down:
-	@docker compose down
-
-k6:
-	@k6 run k6/loadtest.js
 
 demo:
 	@bash scripts/demo.sh
@@ -56,3 +63,23 @@ failover:
 
 loadex:
 	@./bin/loadex
+
+install: build
+	@echo "Installing to GOPATH/bin..."
+	@go install ./cmd/loadex
+	@go install ./cmd/loadbalancer
+	@go install ./cmd/backend
+
+help:
+	@echo "Available commands:"
+	@echo "  make build          # Build binaries to ./bin/"
+	@echo "  make install        # Install to GOPATH/bin"
+	@echo "  make clean          # Remove build artifacts"
+	@echo "  make test           # Run all tests"
+	@echo "  make testsum        # Run all tests using gotestsum"
+	@echo "  make test-e2e       # Run integration tests"
+	@echo "  make test-chaos     # Run chaos tests"
+	@echo "  make test-algo      # Run load balancing algorithm tests"
+	@echo "  make help           # Show this help message"
+	@echo "  make up             # Start docker cluster"
+	@echo "  make down           # Stop docker cluster"

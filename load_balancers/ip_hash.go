@@ -24,35 +24,37 @@ func NewIPHash(serverPool *pool.ServerPool) *IPHash {
 	}
 }
 
-func (lb *IPHash) NextServer(r *http.Request) (*url.URL, error) {
-	servers := lb.serverPool.GetServers()
-	if len(servers) == 0 {
-		return nil, fmt.Errorf("No Servers found")
-	} 
-
+func calculateHash(r *http.Request) (uint32) {
 	srcIPPort := r.RemoteAddr
 	srcIP, _, err := net.SplitHostPort(srcIPPort)
 	if err != nil {
-		srcIP = srcIPPort // fallback if it doesn't have a port
+		srcIP = srcIPPort
 	}
 
-	var destIPPort string 
+	var destIPPort string
 	if localAddr := r.Context().Value(http.LocalAddrContextKey); localAddr != nil {
 		destIPPort = localAddr.(net.Addr).String()
-	} else{
+	} else {
 		destIPPort = r.Host
 	}
-
 	hashKey := fmt.Sprintf("%s-%s", srcIP, destIPPort)
 
 	h := fnv.New32a()
 	h.Write([]byte(hashKey))
 	hashValue := h.Sum32()
+	return hashValue
+}
+
+func (lb *IPHash) NextServer(r *http.Request) (*url.URL, error) {
+	servers := lb.serverPool.GetServers()
+	if len(servers) == 0 {
+		return nil, fmt.Errorf("No Servers found")
+	}
 
 	healthyServersURL := []string{}
 	for _, srv := range servers {
 		if lb.serverPool.IsAlive(srv) {
-			healthyServersURL= append(healthyServersURL, srv)
+			healthyServersURL = append(healthyServersURL, srv)
 		}
 	}
 	if len(healthyServersURL) == 0 {
@@ -62,10 +64,11 @@ func (lb *IPHash) NextServer(r *http.Request) (*url.URL, error) {
 		return nil, fmt.Errorf("All servers are down")
 	}
 
+	hashValue := calculateHash(r)
 	serverIdx := int(hashValue) % len(healthyServersURL)
 	selectedServerURL := healthyServersURL[serverIdx]
 	if logger.Log != nil {
-		logger.Log.Debug("Selected server via IP Hash", "server", selectedServerURL, "hashKey", hashKey, "hashValue", hashValue)
+		logger.Log.Debug("Selected server via IP Hash", "server", selectedServerURL, "hashValue", hashValue)
 	}
 	return url.Parse(selectedServerURL)
 }
@@ -77,18 +80,18 @@ func (lb *IPHash) Handler(w http.ResponseWriter, r *http.Request) {
 	target, err := lb.NextServer(r)
 	if err != nil {
 		http.Error(w, "No servers available", http.StatusServiceUnavailable)
-		return 
+		return
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
-	proxyFailed := false 
+	proxyFailed := false
 
 	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 		if logger.Log != nil {
 			logger.Log.Warn("Server request failed", "target", target.String(), "error", err)
 		}
 		lb.serverPool.UpdateHealthMap(target.String(), false)
-		proxyFailed = true 
+		proxyFailed = true
 	}
 
 	rw := &observability.ResponseWriterRecorder{ResponseWriter: w, StatusCode: http.StatusOK}

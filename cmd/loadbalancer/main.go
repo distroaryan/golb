@@ -19,6 +19,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+const (
+	HEALTH_CHECK_PERIOD = 5 * time.Second
+)
+
 var (
 	port        int
 	backendsStr string
@@ -102,7 +106,7 @@ func main() {
 
 	hc := health_checker.NewHealthChecker(serverPool)
 	ctx, stopHC := context.WithCancel(context.Background())
-	go hc.Start(ctx, 5*time.Second)
+	go hc.Start(ctx, HEALTH_CHECK_PERIOD)
 
 	mux := http.NewServeMux()
 
