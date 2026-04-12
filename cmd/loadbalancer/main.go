@@ -14,8 +14,9 @@ import (
 
 	"github.com/distroaryan/golb/health_checker"
 	lb "github.com/distroaryan/golb/load_balancers"
-	"github.com/distroaryan/golb/logger"
+	logger "github.com/distroaryan/golb/logger"
 	pool "github.com/distroaryan/golb/server_pool"
+	"github.com/distroaryan/golb/web"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -58,6 +59,13 @@ func handleAdd(w http.ResponseWriter, r *http.Request) {
 	serverPool.AddServer(target)
 	fmt.Fprintf(w, "Added %s to the pool\n", target)
 	logger.Log.Info("Manual add-server executed", "url", target)
+}
+
+func handleInfo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"algorithm": algorithm,
+	})
 }
 
 func main() {
@@ -116,7 +124,11 @@ func main() {
 	// System Endpoints
 	mux.HandleFunc("/api/health", handleHealth)
 	mux.HandleFunc("/api/add", handleAdd)
+	mux.HandleFunc("/api/info", handleInfo)
 	
+	// UI Dashboard
+	mux.Handle("/dashboard/", http.StripPrefix("/dashboard/", http.FileServer(http.FS(web.EmbeddedFiles))))
+
 	// Fallback proxy
 	mux.HandleFunc("/", proxyHandler)
 

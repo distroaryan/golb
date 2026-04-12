@@ -29,7 +29,7 @@ Loadex was created to deeply understand load balancers and to practice creating 
 - **Real Fault Tolerance**: Survives server crashes with an automatic redirection and retry mechanism.
 - **Thread-Safe**: Concurrent-safe operations with mutexes.
 - **Full Observability**: Prometheus metrics and Grafana dashboards.
-- **Multiple Interfaces**: CLI and REST API.
+- **Multiple Interfaces**: CLI, REST API and Web UI.
 - **Production Features**: Health checks, monitoring, and multiple algorithms.
 
 **Use Cases**:
@@ -81,7 +81,7 @@ Loadex uses GitHub Actions to ensure code quality and stability. Whenever a new 
            v
 +----------------------+
 |                      |
-|    Load Balancer     |
+|    Loadex     |
 |                      |
 +----------------------+
       /    |      \

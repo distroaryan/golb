@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loadex | Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#7d64ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="#7d64ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="#7d64ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h1>Loadex</h1>
+            </div>
+            <nav>
+                <a href="#" class="nav-item active">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                    Cluster Overview
+                </a>
+            </nav>
+            <div class="branding-footer">
+                <p>Status: <span class="status-live">Live</span></p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header>
+                <h2>Cluster Overview</h2>
+                <div class="header-actions">
+                    <div class="algo-display">
+                        <span class="algo-label">Algorithm:</span>
+                        <span id="algoName" class="badge algo-badge">Loading...</span>
+                    </div>
+                    <button id="sendTrafficBtn" class="btn btn-secondary" style="border-color: var(--accent-color); color: var(--accent-color);">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        Send Traffic
+                    </button>
+                    <button id="refreshBtn" class="btn btn-secondary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                        Manual Refresh
+                    </button>
+                    <button id="addNodeBtn" class="btn btn-primary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        Add Node
+                    </button>
+                </div>
+            </header>
+
+            <!-- Stats Bar -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-title">Total Nodes</div>
+                    <div class="stat-value" id="statTotal">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Healthy Nodes</div>
+                    <div class="stat-value text-success" id="statHealthy">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Offline Nodes</div>
+                    <div class="stat-value text-danger" id="statOffline">0</div>
+                </div>
+            </div>
+
+            <!-- Backend Nodes Grid -->
+            <div class="section-header">
+                <h3>Backend Nodes</h3>
+                <div class="poll-indicator">
+                    <span class="pulse"></span> Polling live
+                </div>
+            </div>
+            
+            <div id="nodesGrid" class="nodes-grid">
+                <!-- Nodes will be injected here via JS -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for Adding Node -->
+    <div id="addNodeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Backend Server</h3>
+                <span class="close-btn">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="nodeUrl">Server URL</label>
+                    <input type="url" id="nodeUrl" placeholder="http://localhost:8006" required>
+                    <small>Ensure the server exposes a /health endpoint.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelModalBtn" class="btn btn-secondary">Cancel</button>
+                <button id="submitNodeBtn" class="btn btn-primary">Add Server</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
