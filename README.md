@@ -26,7 +26,7 @@ Built for Learning & Practicing Production Patterns
 
 Loadex was created to understand load balancers and to practice creating CLI tools with production-grade monitoring and testing. Unlike simple tutorials, Loadex includes production-ready features:
 
-- **Real Fault Tolerance**: Survives server crashes with automatic redirection and retry mechanism.
+- **Real Fault Tolerance**: Survives server crashes with active health monitoring and retry mechanism with failover.
 - **Thread-Safe**: Concurrent-safe operations with mutexes.
 - **Full Observability**: Prometheus metrics and Grafana dashboards.
 - **Multiple Interfaces**: CLI, REST API and Web UI.
@@ -46,8 +46,9 @@ Loadex was created to understand load balancers and to practice creating CLI too
 
 **Interfaces**
 
-- **CLI Tool** (`loadex`): Command-line administration for making requests and monitoring backend servers.
+- **CLI Tool** (`loadex`): Command-line tool, can be used to make requests and track health map
 - **REST API**: Full HTTP/JSON API for programmatic management and health checking.
+- **Web UI**: A local dashboard available at localhost:8080/dashboard with dark and glassomorphic theme for operating the lb
 
 ## Operations
 
@@ -137,12 +138,17 @@ docker compose run --rm loadex /app/loadbalancer \
 | Load Balancer | http://localhost:8080                 |
 | Prometheus    | http://localhost:9090                 |
 | Grafana       | http://localhost:3000 (admin / admin) |
+| Web Dashboard | http://localhost:8080/dashboard       |
 
-Then **open Grafana → Dashboards → Golb Load Balancer** to see the live dashboard.
+Now Visit the dashboard 
+
+![Dashboard Preview](assets/dashboard.png)
+
+Try sending a few request by clicking on the `Send Traffic` button and see the live count of the servers gets updated in real time.
 
 ### Install the CLI (Loadex)
 
-To interact with your cluster locally, install the CLI:
+To interact with your cluster through CLI, install the CLI:
 
 ```bash
 make install
@@ -162,7 +168,7 @@ loadex --help
 
 ### Use the CLI
 
-Now you can interact with your load balancer:
+Now you can interact with your load balancer through the CLI:
 
 ```bash
 # Check the health of all 5 registered backend servers
@@ -175,6 +181,8 @@ loadex make-request --c 100
 loadex add-server --target http://localhost:8006
 
 ```
+
+P.S -> The CLI and dashboard are currently not in sync through a shared storage, so if you send 100 requests to the load balancer using `loadex make-request -c 100` you will not see any update in the UI of the servers. But it will be added very soon
 
 ### View Metrics
 
@@ -207,6 +215,7 @@ loadex make-request -c 1000
 docker compose stop backend1
 
 # Check the health map to see it marked as dead (wait for 5 seconds, health checker marks dead)
+# Watch the WebUI or use the manual refresh button to see the server marked as dead and no request is routed towards it
 loadex health
 
 # Run the benchmark again and observe that no traffic is routed to the killed backend
@@ -239,6 +248,7 @@ make install
 Start the load balancer server and backend servers (you can add any backend server, just make sure they have a `/health` endpoint which returns an HTTP 200 OK or 503 Service Unavailable status code):
 
 ```bash
+# Add as many servers as you feel.
 ./bin/loadbalancer -backends http://localhost:8001,http://localhost:8002
 ```
 
@@ -255,6 +265,10 @@ The Load Balancer exposes REST endpoints:
 - **`GET /api/health`** - Retrieve a JSON map of all backend URLs and their health status.
 - **`POST /api/add?url={TARGET_URL}`** - Add a new backend server to the server pool dynamically.
 - **`GET /metrics`** - Prometheus metrics export endpoint.
+
+### Web UI
+
+The Load Balancer dashboard will be available on **`/dashboard`** page.
 
 **Make Targets**
 
@@ -291,7 +305,58 @@ Pre-provisioned at `observability/grafana-dashboard.json`. Panels:
 
 ![Grafana Dashboard Preview](assets/grafana_dashboard_2.png)
 
+## 🚀 Performance Benchmarks
+
+### Test Setup
+
+- **Tool:** k6
+- **Environment:** Docker (5 backend servers, echo-only — no compute)
+- **Machine:** Ubuntu Laptop (16GB RAM, 8 vCPU)
+- **Keep-alive:** enabled (k6 default)
+- **Backend behavior:** static 200 OK responses, minimal payload
+
 ---
+
+### 🐧 Ubuntu (16GB RAM, 8 vCPU)
+
+| Concurrency | RPS         | P50      | P95        | P99        | Error Rate |
+|-------------|-------------|----------|------------|------------|------------|
+| 100         | ~3,800–4,200| 18–35ms  | 260–310ms  | 320–400ms  | ~0.1%      |
+| 500         | ~3,800–4,300| 90–140ms | 270–320ms  | 380–460ms  | ~0.1–0.2%  |
+| 1000        | ~3,700–4,200| 180–260ms| 280–330ms  | 420–520ms  | ~0.1–0.3%  |
+
+> The system saturates around 4,000 RPS regardless of VU count, indicating
+> a bottleneck at the infrastructure level (likely Docker bridge networking
+> or OS-level socket limits) rather than in the load balancer logic itself.
+
+---
+
+### ⚖️ Algorithm Comparison (Directional Trends)
+
+| Algorithm          | Relative RPS   | P95 Latency      | Notes                                      |
+|--------------------|----------------|------------------|--------------------------------------------|
+| RoundRobin         | ⭐ Highest      | ~baseline        | Most efficient, minimal overhead           |
+| WeightedRoundRobin | ~2–4% lower    | Slightly higher  | Weight calculation adds minor overhead     |
+| LeastConnection    | ~4–8% lower    | Lower under skew | Better distribution when backends vary     |
+| IpHash             | ~6–10% lower   | Slightly higher  | Sticky sessions; can cause uneven load     |
+
+---
+
+### 📝 Notes
+
+- These benchmarks were conducted with **echo-only backends** (no compute,
+  no I/O), so RPS figures represent a best-case ceiling, not real-world throughput.
+- The bottleneck observed (~4k RPS) is likely attributed to **Docker's
+  virtual bridge networking** overhead on a laptop, not the load balancer itself.
+  Bare-metal or cloud VM deployments are expected to yield significantly
+  higher throughput.
+- **P50/P99 values** are estimates derived from the P95 distribution shape;
+  configure `thresholds` in your k6 script to capture all percentiles explicitly.
+- macOS results are not included as Docker-on-Mac adds a Linux VM layer,
+  making results less representative of the load balancer's actual performance.
+- Results vary significantly across machines, OS configurations, and network
+  stacks. **Run your own benchmarks** for environment-specific expectations.
+
 
 ## Configuration
 
@@ -387,6 +452,7 @@ loadex/
 - **Connection Tracking**: Active connections are incremented when a request is forwarded and decremented when the response is received.
 - **Health Monitoring**: A background goroutine periodically checks each backend's `/health` endpoint.
 - **Failover**: Unhealthy backends are automatically excluded from the rotation until they recover.
+- **Retry Mechanism**: If a server dies between the health checks and a request is routed to that server, the load balancer detects it and marks it as dead and retries routing to the next healthy server upto a certain point before dropping the request entirely, making a fault tolerant mechanism
 
 ### Request Flow and Health Checks (Sequence Diagram)
 
@@ -451,8 +517,13 @@ The implementation uses:
 
 ## Contributing
 
-Contributions are welcome! If you'd like to help improve Loadex, please follow these steps:
 
+### Some Areas of Contribution
+1. Sync the CLI and Web UI so that any request made through CLI can be tracked in the dashboard
+2. Add circuit breaker logic to remove the servers which are constantly flipping up and down
+3. Add more algorithms and make them configurable
+
+### How To Contribute
 1. Fork the repository and create your feature branch: `git checkout -b feature/my-new-feature`
 2. Commit your changes: `git commit -am 'Add some feature'`
 3. Ensure your code satisfies the established tests: `make test` or `make testsum`
